@@ -17,22 +17,36 @@
 #include <QContextMenuEvent>
 #include <QAction>
 #include <QLabel>
+#include <QSettings>
+#include <signal.h>
 
 #include "selectionwidget.h"
 #include "windowselectiondialog.h"
 #include "webcamselectiondialog.h"
+#include "settingsdialog.h"
+
+#include <QComboBox>
 
 class ScreenRecorder : public QWidget {
     Q_OBJECT
 
 public:
-    ScreenRecorder(QWidget *parent = nullptr) : QWidget(parent), m_selectionWidget(nullptr), m_windowSelectionDialog(nullptr), m_selectedWebcam("/dev/video0") {
+    ScreenRecorder(QWidget *parent = nullptr) : QWidget(parent), m_selectionWidget(nullptr), m_windowSelectionDialog(nullptr), m_selectedWebcam("/dev/video0"), m_isPaused(false) {
         setWindowTitle("Screen Recorder");
         setContextMenuPolicy(Qt::CustomContextMenu);
         connect(this, &QWidget::customContextMenuRequested, this, &ScreenRecorder::showContextMenu);
 
 
         QVBoxLayout *mainLayout = new QVBoxLayout(this);
+
+        // Top buttons
+        QHBoxLayout *topButtonsLayout = new QHBoxLayout();
+        m_aboutButton = new QPushButton("About", this);
+        m_settingsButton = new QPushButton("Settings", this);
+        topButtonsLayout->addStretch();
+        topButtonsLayout->addWidget(m_aboutButton);
+        topButtonsLayout->addWidget(m_settingsButton);
+        mainLayout->addLayout(topButtonsLayout);
 
         // Recording options
         QGroupBox *optionsGroupBox = new QGroupBox("Recording Options", this);
@@ -74,16 +88,19 @@ public:
         m_startButton = new QPushButton("Start Recording", this);
         m_stopButton = new QPushButton("Stop Recording", this);
         m_stopButton->setEnabled(false);
+        m_pauseButton = new QPushButton("Pause", this);
+        m_pauseButton->setEnabled(false);
         controlsLayout->addWidget(m_startButton);
+        controlsLayout->addWidget(m_pauseButton);
         controlsLayout->addWidget(m_stopButton);
-        m_aboutButton = new QPushButton("About", this);
-        controlsLayout->addWidget(m_aboutButton);
         mainLayout->addLayout(controlsLayout);
 
+        connect(m_aboutButton, &QPushButton::clicked, this, &ScreenRecorder::showAboutDialog);
+        connect(m_settingsButton, &QPushButton::clicked, this, &ScreenRecorder::openSettingsDialog);
         connect(m_startButton, &QPushButton::clicked, this, &ScreenRecorder::startRecording);
+        connect(m_pauseButton, &QPushButton::clicked, this, &ScreenRecorder::pauseRecording);
         connect(m_stopButton, &QPushButton::clicked, this, &ScreenRecorder::stopRecording);
         connect(m_selectWebcamButton, &QPushButton::clicked, this, &ScreenRecorder::openWebcamSelectionDialog);
-        connect(m_aboutButton, &QPushButton::clicked, this, &ScreenRecorder::showAboutDialog);
 
 
         m_process = new QProcess(this);
@@ -106,6 +123,11 @@ private slots:
         dialog.exec();
     }
 
+    void openSettingsDialog() {
+        SettingsDialog dialog(this);
+        dialog.exec();
+    }
+
     void onWebcamSelected(const QString &devicePath) {
         m_selectedWebcam = devicePath;
         m_selectedWebcamLabel->setText(QString("Selected Webcam: %1").arg(m_selectedWebcam));
@@ -121,6 +143,7 @@ private slots:
     void startRecording() {
         m_startButton->setEnabled(false);
         m_stopButton->setEnabled(true);
+        m_pauseButton->setEnabled(true);
         m_startAction->setEnabled(false);
         m_stopAction->setEnabled(true);
 
@@ -148,6 +171,24 @@ private slots:
         }
     }
 
+    void pauseRecording() {
+        if (m_process->state() != QProcess::Running) {
+            return;
+        }
+
+        if (m_isPaused) {
+            // Resume
+            kill(m_process->processId(), SIGCONT);
+            m_pauseButton->setText("Pause");
+            m_isPaused = false;
+        } else {
+            // Pause
+            kill(m_process->processId(), SIGSTOP);
+            m_pauseButton->setText("Resume");
+            m_isPaused = true;
+        }
+    }
+
     void onAreaSelected(const QRect &rect) {
         startFfmpeg(rect);
     }
@@ -160,14 +201,34 @@ private slots:
         AudioSource audioSource = m_audioSourceComboBox->currentData().value<AudioSource>();
         bool includeWebcam = m_webcamCheckBox->isChecked();
 
-        QString outputDir = "/home/emran/Videos";
+        QSettings settings;
+        QString outputDir = settings.value("outputLocation", "/home/emran/Videos").toString();
+        int formatIndex = settings.value("fileNameFormatIndex", 0).toInt();
+
+        QComboBox tempComboBox;
+        tempComboBox.addItem("recording_{timestamp}.mkv", "recording_%1.mkv");
+        tempComboBox.addItem("{timestamp}_recording.mkv", "%1_recording.mkv");
+        tempComboBox.addItem("ScreenRecord_{timestamp}.mkv", "ScreenRecord_%1.mkv");
+        tempComboBox.addItem("{timestamp}.mkv", "%1.mkv");
+        tempComboBox.addItem("custom_{index}.mkv", "custom_%1.mkv");
+        QString fileNameFormat = tempComboBox.itemData(formatIndex).toString();
+
         QDir dir(outputDir);
         if (!dir.exists()) {
             dir.mkpath(".");
         }
 
-        QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
-        QString outputFileName = QString("%1/recording_%2.mkv").arg(outputDir, timestamp);
+        QString outputFileName;
+        if (fileNameFormat == "custom_%1.mkv") {
+            int videoIndex = settings.value("videoIndex", 1).toInt();
+            QString prefix = settings.value("prefix", "video").toString();
+            outputFileName = QString("%1_%2.mkv").arg(prefix).arg(videoIndex, 2, 10, QChar('0'));
+            settings.setValue("videoIndex", videoIndex + 1);
+        } else {
+            QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+            outputFileName = QString(fileNameFormat).arg(timestamp);
+        }
+        outputFileName.prepend(outputDir + "/");
 
 
         QStringList args;
@@ -230,6 +291,9 @@ private slots:
     void stopRecording() {
         m_startButton->setEnabled(true);
         m_stopButton->setEnabled(false);
+        m_pauseButton->setEnabled(false);
+        m_pauseButton->setText("Pause");
+        m_isPaused = false;
         m_startAction->setEnabled(true);
         m_stopAction->setEnabled(false);
         if (m_process->state() == QProcess::Running) {
@@ -264,6 +328,7 @@ private:
 
     QPushButton *m_startButton;
     QPushButton *m_stopButton;
+    QPushButton *m_pauseButton;
     QComboBox *m_captureModeComboBox;
     QComboBox *m_audioSourceComboBox;
     QCheckBox *m_webcamCheckBox;
@@ -277,6 +342,8 @@ private:
     QAction *m_stopAction;
     QString m_selectedWebcam;
     QPushButton *m_aboutButton;
+    QPushButton *m_settingsButton;
+    bool m_isPaused;
 };
 
 int main(int argc, char *argv[]) {

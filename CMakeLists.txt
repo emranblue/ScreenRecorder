@@ -17,6 +17,7 @@ add_executable(ScreenRecorder
   src/selectionwidget.cpp
   src/windowselectiondialog.cpp
   src/webcamselectiondialog.cpp
+  src/settingsdialog.cpp
 )
 
 target_link_libraries(ScreenRecorder

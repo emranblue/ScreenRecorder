@@ -1,5 +1,0 @@
-/media/emran/sdcard/screenrecoreder/build/CMakeFiles/ScreenRecorder.dir
-/media/emran/sdcard/screenrecoreder/build/CMakeFiles/edit_cache.dir
-/media/emran/sdcard/screenrecoreder/build/CMakeFiles/rebuild_cache.dir
-/media/emran/sdcard/screenrecoreder/build/CMakeFiles/ScreenRecorder_autogen_timestamp_deps.dir
-/media/emran/sdcard/screenrecoreder/build/CMakeFiles/ScreenRecorder_autogen.dir

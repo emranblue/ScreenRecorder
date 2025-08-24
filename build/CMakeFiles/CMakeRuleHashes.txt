@@ -1,4 +1,0 @@
-# Hashes of file build rules.
-38f049d3ea1f62bd0adfcf6d859a756a CMakeFiles/ScreenRecorder_autogen
-38f049d3ea1f62bd0adfcf6d859a756a CMakeFiles/ScreenRecorder_autogen_timestamp_deps
-274e1550a67e234d6e6c89888b0ffb4d ScreenRecorder_autogen/timestamp
