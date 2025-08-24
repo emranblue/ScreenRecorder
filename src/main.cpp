@@ -19,6 +19,7 @@
 #include <QLabel>
 #include <QSettings>
 #include <signal.h>
+#include <QIcon>
 
 #include "selectionwidget.h"
 #include "windowselectiondialog.h"
@@ -350,6 +351,7 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
     ScreenRecorder recorder;
+    recorder.setWindowIcon(QIcon(":/icon.ico"));
     recorder.show();
 
     return app.exec();

@@ -12,12 +12,17 @@ set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 COMPONENTS Core Gui Widgets REQUIRED)
 
-add_executable(ScreenRecorder
+add_executable(ScreenRecorder WIN32
   src/main.cpp
   src/selectionwidget.cpp
   src/windowselectiondialog.cpp
   src/webcamselectiondialog.cpp
   src/settingsdialog.cpp
+  src/resources.qrc
+)
+
+set_target_properties(ScreenRecorder PROPERTIES
+  RC_ICONS icon.ico
 )
 
 target_link_libraries(ScreenRecorder
